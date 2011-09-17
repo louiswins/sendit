@@ -14,7 +14,7 @@
 #define RESPHEADER \
 "HTTP/1.1 200 OK\r\n" \
 "Content-Type: text/html\r\n\r\n"
-#define RESPBODY \
+#define RESPBODYGET \
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
 "<html>\n" \
 "<head>\n" \
@@ -25,7 +25,14 @@
 "<p><label for=\"upfile\">Choose a file to upload: </label><input id=\"upfile\" name=\"upfile\" type=\"file\">\n" \
 "<p><input type=\"submit\" value=\"Upload it\">\n" \
 "</form>\n"
-
+#define RESPBODYPOST \
+"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
+"<html>\n" \
+"<head>\n" \
+"<meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\">\n" \
+"<title>Done</title>\n" \
+"<body>\n" \
+"<p>Done. You've uploaded it.\n"
 
 
 typedef int socketfd;
@@ -49,10 +56,6 @@ int main(int argc, char *argv[]) {
 	char recvbuf[RECVBUFLEN];
 	int bufpos;
 
-#if 0
-	char headerbuf[sizeof(RESPHEADER)+10]; /* up to 10 digits for our body size */
-	int headersize;
-#endif
 
 	/* READ DATA */
 	accepted = setup_sockets(&theirs, &addr_size);
@@ -65,16 +68,8 @@ int main(int argc, char *argv[]) {
 		printf("Finished parsing network data.\n");
 	}
 
-#if 0
-#ifdef NEEDLENGTH
-	headersize = snprintf(headerbuf, sizeof(headerbuf), RESPHEADER, sizeof(RESPBODY)-1);
-#else
-	headersize = snprintf(headerbuf, sizeof(headerbuf), RESPHEADER);
-#endif
-	send(accepted, headerbuf, headersize, 0);
-#endif
 	send(accepted, RESPHEADER, sizeof(RESPHEADER), 0);
-	send(accepted, RESPBODY, sizeof(RESPBODY), 0);
+	send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
 
 	close(accepted);
 
