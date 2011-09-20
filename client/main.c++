@@ -1,9 +1,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <unistd.h>
 
 #define PORT "12345"
@@ -34,13 +34,15 @@
 "<body>\n" \
 "<p>Done. You've uploaded it.\n"
 
+using namespace std;
+
 
 typedef int socketfd;
-typedef enum {
+enum http_type {
 	HTTP_UNKNOWN,
 	HTTP_GET,
 	HTTP_POST
-} http_type;
+};
 
 socketfd setup_sockets(struct addrinfo *theirs, socklen_t *addr_size);
 /* Let's return the content length */
@@ -157,18 +159,6 @@ int parse_headers(socketfd sock, char *recvbuf, int recvbuflen) {
 			perror("recv");
 			exit(EXIT_FAILURE);
 		}
-#if 0
-		if (need_type) {
-			if (!strncmp(recvbuf, "GET", 3)) {
-				ret = HTTP_GET;
-			} else if (!strncmp(recvbuf, "POST", 4)) {
-				ret = HTTP_POST;
-			} else {
-				ret = HTTP_UNKNOWN;
-			}
-			need_type = 0;
-		}
-#endif
 		for (i=0; i<bytesread; ++i) {
 #ifdef TEE
 			putchar(recvbuf[i]);
