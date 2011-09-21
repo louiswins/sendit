@@ -1,7 +1,5 @@
-/*
 #ifndef RECV_BUF_H
 #define RECV_BUF_H
-*/
 
 #include <streambuf>
 #include <cstdlib> /* std::size_t */
@@ -29,5 +27,4 @@ private:
 	char *buffer_;
 };
 
-/*
 #endif /* RECV_BUF_H */

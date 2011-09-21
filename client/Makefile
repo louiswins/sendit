@@ -1,13 +1,17 @@
 # Enable warnings! Warnings good!
+CC = g++
 CFLAGS += -Wall -pedantic
 
 all : client
 
-client: main.o
+client: main.o recv_buf.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
+main.o: recv_buf.h
+recv_buf.o: recv_buf.h
+
 %.o: %.c++
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 clean:
-	rm -f client main.o
+	rm -f client *.o
