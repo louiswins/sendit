@@ -6,5 +6,8 @@ all : client
 client: main.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
+%.o: %.c++
+	$(CC) $(CFLAGS) -c -o $@ $^
+
 clean:
 	rm -f client main.o
