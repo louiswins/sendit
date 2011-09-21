@@ -1,3 +1,8 @@
+#include "recv_buf.h"
+#include <map>
+#include <string>
+#include <iostream>
+#include <sstream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
@@ -34,24 +39,24 @@
 "<body>\n" \
 "<p>Done. You've uploaded it.\n"
 
+
 using namespace std;
 
-
-typedef int socketfd;
-enum http_type {
-	HTTP_UNKNOWN,
-	HTTP_GET,
-	HTTP_POST
+struct http_info {
+	string method,
+	       request_uri,
+	       http_version;
+	map<string, string> headers;
 };
 
-socketfd setup_sockets(struct addrinfo *theirs, socklen_t *addr_size);
+int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size);
 /* Let's return the content length */
-int parse_headers(socketfd sock, char *recvbuf, int recvbuflen);
+http_info parse_headers(int mysock);
 
 
 int main(int argc, char *argv[]) {
 
-	socketfd accepted;
+	int accepted;
 	struct addrinfo theirs;
 	socklen_t addr_size;
 
@@ -62,13 +67,21 @@ int main(int argc, char *argv[]) {
 	/* READ DATA */
 	accepted = setup_sockets(&theirs, &addr_size);
 
-	bufpos = parse_headers(accepted, recvbuf, RECVBUFLEN);
+	http_info headers = parse_headers(accepted);
+	if (headers.http_version == "HTTP/1.1" && !headers.headers.count("Host")) {
+		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data." << endl <<
+			"http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1" << endl;
+	} else if (headers.headers.count("Host")) {
+		cout << "The user wanted the host " << headers.headers["Host"] << endl;
+	}
+#if 0
 	printf("Parsed %d bytes of %d.\n", bufpos, RECVBUFLEN);
 	if (recvbuf[bufpos]) {
 		printf("Rest of recv()'d data: %s\n", recvbuf+bufpos);
 	} else {
 		printf("Finished parsing network data.\n");
 	}
+#endif
 
 	send(accepted, RESPHEADER, sizeof(RESPHEADER), 0);
 	send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
@@ -80,12 +93,12 @@ int main(int argc, char *argv[]) {
 
 
 
-socketfd setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
+int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 	int status;
 	struct addrinfo hints,
 			*res,
 			*p;
-	socketfd sockfd,
+	int sockfd,
 		 ret;
 	int yes=1;
 
@@ -148,35 +161,56 @@ socketfd setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 }
 
 
-int parse_headers(socketfd sock, char *recvbuf, int recvbuflen) {
-	int bytesread;
-	int heended = 0;
-	int i = 0;
-/*	int need_type = 1;*/
-
-	while ((bytesread = recv(sock, recvbuf, recvbuflen, 0))) {
-		if (bytesread == -1) {
-			perror("recv");
-			exit(EXIT_FAILURE);
-		}
-		for (i=0; i<bytesread; ++i) {
-#ifdef TEE
-			putchar(recvbuf[i]);
-#endif
-			if (recvbuf[i] == HTTPHEADEREND[heended]) {
-				++heended;
-				if (heended == sizeof(HTTPHEADEREND)-1) {
-					break;
-				}
-			} else {
-				heended = 0;
-			}
-		}
-		if (heended == sizeof(HTTPHEADEREND)-1) {
-			/* We've received \r\n\r\n */
-			break;
-		}
+istream &gethttpline(istream &in, string &str) {
+	getline(in, str);
+	size_t sz = str.size();
+	// if the client uses proper HTTP (and ends lines with \r\n) we take
+	// that into account
+	if (sz > 0 && str[sz-1] == '\r') {
+		str.resize(sz-1);
 	}
+	return in;
+}
 
-	return i;
+
+http_info parse_headers(int sock) {
+	recv_buf buf(sock);
+	istream rvstream(&buf);
+
+	http_info ret;
+
+	string curhead;
+
+	gethttpline(rvstream, curhead);
+	istringstream httpstatus(curhead);
+	httpstatus >> ret.method >> ret.request_uri >> ret.http_version;
+
+#ifdef TEE
+	cout << "Request Line: " << ret.method << ' ' << ret.request_uri << ' ' << ret.http_version << endl << endl << "General Headers:" << endl;
+#endif
+
+	// we do this to avoid messed up parsing on the request line or on an empty line.
+	// if we receive messed-up headers, I don't feel bad about dying because someone
+	// is doing something nefarious.
+	gethttpline(rvstream, curhead);
+	while (!curhead.empty()) {
+		string key;
+		istringstream tmp(curhead);
+		getline(tmp, key, ':');
+		if (curhead.size() == key.size()) {
+			// there wasn't a ':', so there's something wrong.
+			gethttpline(rvstream, curhead);
+			continue;
+		}
+		string val = curhead.substr(key.size() + 1);
+		while (val[0] == ' ')
+			val.erase(0, 1);
+		
+		ret.headers[key] = val;
+#ifdef TEE
+		cout << key << ": " << ret.headers[key] << endl;
+#endif
+		gethttpline(rvstream, curhead);
+	}
+	return ret;
 }
