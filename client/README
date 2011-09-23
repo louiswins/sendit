@@ -1,0 +1,33 @@
+Sendit is a small program for sending large files over a network.
+
+It includes a very small, basic HTTP 'server'. The server accepts connections
+on a certain port, and offers to the user to upload a file if the correct page
+is accessed. It then saves that file to the current working directory, and
+exits. If the user accesses the wrong page, it replies with a 404.
+
+Sendit is supposed to be used in conjunction with a web service to automate the
+users and IP addresses:
+
+1. Alice wants to send a file to Bob, but the file is too large to email. She
+   also doesn't want to upload it on a public file server like Rapidshare and
+   have Bob download it.
+2. Alice connects to the sendit web service and enters hers and Bob's email
+   addresses.
+3. The web service generates a unique key for the transaction, and sends an
+   email to Alice to verify she isn't a spammer, with a link to a certain page
+   to validate the key.
+4. When Alice validates the key, the service sends an email to Bob with a link
+   to download the sendit program customized to only accept connections from
+   Alice's IP, on a page equal to the unique key.
+5. When Bob downloads the program, the service sends an email to Alice with a
+   link to the correct page to access, e.g. if the unique key were
+   1234567890ABCDEF and Bob's IP were 192.0.2.37. The link in Alice's email
+   would be to http://192.0.2.37/1234567890ABCDEF
+6. The web service deletes all information of the transaction. If something
+   goes wrong (like Bob's dynamic IP changing, or, if his server only accepts
+   connections from Alice's IP, her dynamic IP changing), Alice would have to
+   restart at step 2.
+
+Of course the sendit program itself doesn't have to be used with this web
+service, but the service automates the generation of keys and the exchange of
+IP addresses for users who don't know what those things are.

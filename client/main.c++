@@ -72,7 +72,9 @@ int main(int argc, char *argv[]) {
 		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data.\n"
 			"http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1\n";
 	} else if (headers.headers.count("Host")) {
+#ifdef TEE
 		cout << "The user wanted the host " << headers.headers["Host"] << "\n\n";
+#endif
 	}
 
 	if (percent_decode(headers.request_uri) == magic) {
@@ -81,7 +83,9 @@ int main(int argc, char *argv[]) {
 			send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
 		} else if (headers.method == "POST") {
 			string body = get_body(accepted, headers);
+#ifdef TEE
 			cout << "Body (true length " << body.size() << "):\n" << body;
+#endif
 			send(accepted, RESPBODYPOST, sizeof(RESPBODYPOST), 0);
 		}
 	} else {
