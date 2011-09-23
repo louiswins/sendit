@@ -20,6 +20,8 @@
 "HTTP/1.1 404 Not Found\r\n" \
 "Content-Type: text/html\r\n\r\n" \
 "Page does not exist.\r\n"
+#define RESPHEADERCONTINUE \
+"HTTP/1.1 100 Continue\r\n\r\n"
 #define RESPBODYGET \
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
 "<html>\n" \
@@ -78,11 +80,15 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (percent_decode(headers.request_uri) == magic) {
-		send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
 		if (headers.method == "GET") {
+			send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
 			send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
 		} else if (headers.method == "POST") {
+			if (headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
+				send(accepted, RESPHEADERCONTINUE, sizeof(RESPHEADERCONTINUE), 0);
+			}
 			string body = get_body(accepted, headers);
+			send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
 #ifdef TEE
 			cout << "Body (true length " << body.size() << "):\n" << body;
 #endif
