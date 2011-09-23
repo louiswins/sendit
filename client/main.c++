@@ -1,20 +1,17 @@
 #include "recv_buf.h"
+#include "process_http.h"
 #include <map>
 #include <string>
 #include <iostream>
-#include <sstream>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <cstring>
-#include <cstdio>
+#include <cstdio> /* std::perror */
 #include <cstdlib>
 #include <unistd.h>
 
 #define PORT "12345"
-#define RECVBUFLEN 2048
-#define HTTPHEADEREND "\r\n\r\n"
-#define TEE
 
 #define RESPHEADERGOOD \
 "HTTP/1.1 200 OK\r\n" \
@@ -31,7 +28,7 @@
 "<title>Upload</title>\n" \
 "<body>\n" \
 "<form enctype=\"multipart/form-data\" action=\".\" method=\"POST\">\n" \
-"<p><label for=\"upfile\">Choose a file to upload: </label><input id=\"upfile\" name=\"upfile\" type=\"file\">\n" \
+"<p><label for=\"up\">Choose a file to upload: </label><input id=\"up\" name=\"up\" type=\"file\">\n" \
 "<p><input type=\"submit\" value=\"Upload it\">\n" \
 "</form>\n"
 #define RESPBODYPOST \
@@ -47,17 +44,8 @@
 
 using namespace std;
 
-struct http_info {
-	string method,
-	       request_uri,
-	       http_version;
-	map<string, string> headers;
-};
-
 int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size);
-http_info parse_headers(int mysock);
 
-string percent_decode(const string &uri);
 
 int main(int argc, char *argv[]) {
 
@@ -81,15 +69,21 @@ int main(int argc, char *argv[]) {
 
 	http_info headers = parse_headers(accepted);
 	if (headers.http_version == "HTTP/1.1" && !headers.headers.count("Host")) {
-		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data." << endl <<
-			"http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1" << endl;
+		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data.\n"
+			"http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1\n";
 	} else if (headers.headers.count("Host")) {
-		cout << "The user wanted the host " << headers.headers["Host"] << endl;
+		cout << "The user wanted the host " << headers.headers["Host"] << "\n\n";
 	}
 
 	if (percent_decode(headers.request_uri) == magic) {
 		send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
-		send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
+		if (headers.method == "GET") {
+			send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
+		} else if (headers.method == "POST") {
+			string body = get_body(accepted, headers);
+			cout << "Body (true length " << body.size() << "):\n" << body;
+			send(accepted, RESPBODYPOST, sizeof(RESPBODYPOST), 0);
+		}
 	} else {
 		send(accepted, RESPHEADERBAD, sizeof(RESPHEADERBAD), 0);
 	}
@@ -107,7 +101,7 @@ int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 			*res,
 			*p;
 	int sockfd,
-		 ret;
+	    ret;
 	int yes=1;
 
 	memset(&hints, 0, sizeof(hints));
@@ -117,7 +111,7 @@ int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 
 	/* getaddrinfo() to ser up the socket data */
 	if ((status = getaddrinfo(NULL, PORT, &hints, &res)) != 0) {
-		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(status));
+		cerr << "getaddrinfo: " << gai_strerror(status) << '\n';
 		exit(EXIT_FAILURE);
 	}
 
@@ -143,7 +137,7 @@ int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 		break;
 	}
 	if (p == NULL) {
-		fprintf(stderr, "Failed to bind.\n");
+		cerr << "Failed to bind.\n";
 		exit(EXIT_FAILURE);
 	}
 
@@ -165,75 +159,5 @@ int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 	/* Free up the server data */
 	close(sockfd);
 
-	return ret;
-}
-
-
-istream &gethttpline(istream &in, string &str) {
-	getline(in, str);
-	size_t sz = str.size();
-	// if the client uses proper HTTP (and ends lines with \r\n) we take
-	// that into account
-	if (sz > 0 && str[sz-1] == '\r') {
-		str.resize(sz-1);
-	}
-	return in;
-}
-
-
-http_info parse_headers(int sock) {
-	recv_buf buf(sock);
-	istream rvstream(&buf);
-
-	http_info ret;
-
-	string curhead;
-
-	gethttpline(rvstream, curhead);
-	istringstream httpstatus(curhead);
-	httpstatus >> ret.method >> ret.request_uri >> ret.http_version;
-
-#ifdef TEE
-	cout << "Request Line: " << ret.method << ' ' << ret.request_uri << ' ' << ret.http_version << endl << endl << "General Headers:" << endl;
-#endif
-
-	// we do this to avoid messed up parsing on the request line or on an empty line.
-	// if we receive messed-up headers, I don't feel bad about dying because someone
-	// is doing something nefarious.
-	gethttpline(rvstream, curhead);
-	while (!curhead.empty()) {
-		size_t colon = curhead.find_first_of(':');
-		if (colon == string::npos) {
-			// there wasn't a ':', so there's something wrong.
-			gethttpline(rvstream, curhead);
-			continue;
-		}
-		string key = curhead.substr(0, colon);
-		string val = curhead.substr(colon + 1);
-		while (val[0] == ' ')
-			val.erase(0, 1);
-		
-		ret.headers[key] = val;
-#ifdef TEE
-		cout << key << ": " << ret.headers[key] << endl;
-#endif
-		gethttpline(rvstream, curhead);
-	}
-	return ret;
-}
-
-string percent_decode(const string &uri) {
-	string ret;
-	for (string::const_iterator p = uri.begin(); p < uri.end(); ++p) {
-		if (*p == '%') {
-			char code[3] = { *(p+1), *(p+2) };
-			int val;
-			stringstream(code) >> hex >> val;
-			ret += val;
-			p += 2;
-		} else {
-			ret += *p;
-		}
-	}
 	return ret;
 }
