@@ -1,5 +1,6 @@
 CC = g++
 # Enable warnings! Warnings good!
+CC = g++
 CFLAGS += -Wall -pedantic
 
 all : client

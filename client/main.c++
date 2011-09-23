@@ -75,9 +75,6 @@ int main(int argc, char *argv[]) {
 	struct addrinfo theirs;
 	socklen_t addr_size;
 
-	char recvbuf[RECVBUFLEN];
-	int bufpos;
-
 
 	/* READ DATA */
 	accepted = setup_sockets(&theirs, &addr_size);
