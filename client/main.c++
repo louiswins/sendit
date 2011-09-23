@@ -16,9 +16,13 @@
 #define HTTPHEADEREND "\r\n\r\n"
 #define TEE
 
-#define RESPHEADER \
+#define RESPHEADERGOOD \
 "HTTP/1.1 200 OK\r\n" \
 "Content-Type: text/html\r\n\r\n"
+#define RESPHEADERBAD \
+"HTTP/1.1 404 Not Found\r\n" \
+"Content-Type: text/html\r\n\r\n" \
+"Page does not exist.\r\n"
 #define RESPBODYGET \
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
 "<html>\n" \
@@ -39,6 +43,7 @@
 "<body>\n" \
 "<p>Done. You've uploaded it.\n"
 
+#define DEFAULT_MAGIC "/"
 
 using namespace std;
 
@@ -50,11 +55,21 @@ struct http_info {
 };
 
 int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size);
-/* Let's return the content length */
 http_info parse_headers(int mysock);
 
+string percent_decode(const string &uri);
 
 int main(int argc, char *argv[]) {
+
+	string magic;
+	if (argc <= 1) {
+		magic = DEFAULT_MAGIC;
+	} else {
+		magic = argv[1];
+	}
+	if (magic[0] != '/') {
+		magic = "/" + magic;
+	}
 
 	int accepted;
 	struct addrinfo theirs;
@@ -74,17 +89,13 @@ int main(int argc, char *argv[]) {
 	} else if (headers.headers.count("Host")) {
 		cout << "The user wanted the host " << headers.headers["Host"] << endl;
 	}
-#if 0
-	printf("Parsed %d bytes of %d.\n", bufpos, RECVBUFLEN);
-	if (recvbuf[bufpos]) {
-		printf("Rest of recv()'d data: %s\n", recvbuf+bufpos);
-	} else {
-		printf("Finished parsing network data.\n");
-	}
-#endif
 
-	send(accepted, RESPHEADER, sizeof(RESPHEADER), 0);
-	send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
+	if (percent_decode(headers.request_uri) == magic) {
+		send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
+		send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
+	} else {
+		send(accepted, RESPHEADERBAD, sizeof(RESPHEADERBAD), 0);
+	}
 
 	close(accepted);
 
@@ -194,15 +205,14 @@ http_info parse_headers(int sock) {
 	// is doing something nefarious.
 	gethttpline(rvstream, curhead);
 	while (!curhead.empty()) {
-		string key;
-		istringstream tmp(curhead);
-		getline(tmp, key, ':');
-		if (curhead.size() == key.size()) {
+		size_t colon = curhead.find_first_of(':');
+		if (colon == string::npos) {
 			// there wasn't a ':', so there's something wrong.
 			gethttpline(rvstream, curhead);
 			continue;
 		}
-		string val = curhead.substr(key.size() + 1);
+		string key = curhead.substr(0, colon);
+		string val = curhead.substr(colon + 1);
 		while (val[0] == ' ')
 			val.erase(0, 1);
 		
@@ -211,6 +221,22 @@ http_info parse_headers(int sock) {
 		cout << key << ": " << ret.headers[key] << endl;
 #endif
 		gethttpline(rvstream, curhead);
+	}
+	return ret;
+}
+
+string percent_decode(const string &uri) {
+	string ret;
+	for (string::const_iterator p = uri.begin(); p < uri.end(); ++p) {
+		if (*p == '%') {
+			char code[3] = { *(p+1), *(p+2) };
+			int val;
+			stringstream(code) >> hex >> val;
+			ret += val;
+			p += 2;
+		} else {
+			ret += *p;
+		}
 	}
 	return ret;
 }
