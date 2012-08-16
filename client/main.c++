@@ -13,15 +13,42 @@
 
 #define PORT "12345"
 
-#define RESPHEADERGOOD \
+#define RESPHEADOK \
 "HTTP/1.1 200 OK\r\n" \
+"Server: sendit/0.11\r\n" \
+"Connection: close\r\n" \
 "Content-Type: text/html\r\n\r\n"
-#define RESPHEADERBAD \
+
+#define RESPHEADNFOUND \
 "HTTP/1.1 404 Not Found\r\n" \
-"Content-Type: text/html\r\n\r\n" \
-"Page does not exist.\r\n"
-#define RESPHEADERCONTINUE \
+"Server: sendit/0.11\r\n" \
+"Connection: close\r\n" \
+"Content-Type: text/plain\r\n" \
+"Content-Length: 21\r\n\r\n" \
+"Page does not exist.\n"
+
+#define RESPHEADCONTINUE \
 "HTTP/1.1 100 Continue\r\n\r\n"
+
+#define RESPHEADNOHOST \
+"HTTP/1.1 400 Bad Request\r\n" \
+"Server: sendit/0.11\r\n" \
+"Connection: close\r\n" \
+"Content-Type: text/html\r\n" \
+"Content-Length: 111\r\n\r\n" \
+"<html><body>\n" \
+"<h2>No Host: header received</h2>\n" \
+"HTTP 1.1 requests must include the Host: header.\n" \
+"</body></html>\n"
+
+#define RESPHEADNIMPL \
+"HTTP/1.1 501 Not Implemented\r\n" \
+"Server: sendit/0.11\r\n" \
+"Connection: close\r\n" \
+"Content-Type: text/plain\r\n" \
+"Content-Length: 17\r\n\r\n" \
+"Not implemented.\n"
+
 #define RESPBODYGET \
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
 "<html>\n" \
@@ -33,6 +60,7 @@
 "<p><label for=\"up\">Choose a file to upload: </label><input id=\"up\" name=\"up\" type=\"file\">\n" \
 "<p><input type=\"submit\" value=\"Upload it\">\n" \
 "</form>\n"
+
 #define RESPBODYPOST \
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
 "<html>\n" \
@@ -71,31 +99,36 @@ int main(int argc, char *argv[]) {
 
 	http_info headers = parse_headers(accepted);
 	if (headers.http_version == "HTTP/1.1" && !headers.headers.count("Host")) {
+		send(accepted, RESPHEADNOHOST, sizeof(RESPHEADNOHOST)-1, 0);
+		close(accepted);
 		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data.\n"
-			"http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1\n";
+			"See http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1\n";
+		exit(EXIT_FAILURE);
 	} else if (headers.headers.count("Host")) {
 #ifdef TEE
 		cout << "The user wanted the host " << headers.headers["Host"] << "\n\n";
 #endif
 	}
 
-	if (percent_decode(headers.request_uri) == magic) {
+	if (headers.method != "GET" && headers.method != "POST") {
+		send(accepted, RESPHEADNIMPL, sizeof(RESPHEADNIMPL)-1, 0);
+	} else if (percent_decode(headers.request_uri) == magic) {
 		if (headers.method == "GET") {
-			send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
-			send(accepted, RESPBODYGET, sizeof(RESPBODYGET), 0);
-		} else if (headers.method == "POST") {
+			send(accepted, RESPHEADOK, sizeof(RESPHEADOK)-1, 0);
+			send(accepted, RESPBODYGET, sizeof(RESPBODYGET)-1, 0);
+		} else { // POST
 			if (headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
-				send(accepted, RESPHEADERCONTINUE, sizeof(RESPHEADERCONTINUE), 0);
+				send(accepted, RESPHEADCONTINUE, sizeof(RESPHEADCONTINUE)-1, 0);
 			}
 			string body = get_body(accepted, headers);
-			send(accepted, RESPHEADERGOOD, sizeof(RESPHEADERGOOD), 0);
 #ifdef TEE
 			cout << "Body (true length " << body.size() << "):\n" << body;
 #endif
-			send(accepted, RESPBODYPOST, sizeof(RESPBODYPOST), 0);
+			send(accepted, RESPHEADOK, sizeof(RESPHEADOK)-1, 0);
+			send(accepted, RESPBODYPOST, sizeof(RESPBODYPOST)-1, 0);
 		}
 	} else {
-		send(accepted, RESPHEADERBAD, sizeof(RESPHEADERBAD), 0);
+		send(accepted, RESPHEADNFOUND, sizeof(RESPHEADNFOUND)-1, 0);
 	}
 
 	close(accepted);
