@@ -10,6 +10,11 @@
 
 using namespace std;
 
+
+/* TODO:
+ * support chunked format requests
+ * http://jmarshall.com/easy/http/#http1.1s3
+ */
 string get_body(istream& is, http_info& headers) {
 	if (!headers.headers.count("Content-Length")) return "";
 	size_t len;

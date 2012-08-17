@@ -49,14 +49,16 @@
 "Content-Length: 17\r\n\r\n" \
 "Not implemented.\n"
 
-#define RESPBODYGET \
+#define RESPBODYGET_PREMAGIC \
 "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01//EN\" \"http://www.w3.org/TR/html4/strict.dtd\">\n" \
 "<html>\n" \
 "<head>\n" \
 "<meta http-equiv=\"Content-type\" content=\"text/html;charset=UTF-8\">\n" \
 "<title>Upload</title>\n" \
 "<body>\n" \
-"<form enctype=\"multipart/form-data\" action=\".\" method=\"POST\">\n" \
+"<form enctype=\"multipart/form-data\" action=\""
+#define RESPBODYGET_POSTMAGIC \
+"\" method=\"POST\">\n" \
 "<p><label for=\"up\">Choose a file to upload: </label><input id=\"up\" name=\"up\" type=\"file\">\n" \
 "<p><input type=\"submit\" value=\"Upload it\">\n" \
 "</form>\n"
@@ -70,7 +72,17 @@
 "<body>\n" \
 "<p>Done. You've uploaded it.\n"
 
+
 #define DEFAULT_MAGIC "/"
+
+
+
+
+
+
+
+
+
 
 using namespace std;
 
@@ -88,10 +100,15 @@ int main(int argc, char *argv[]) {
 	if (magic[0] != '/') {
 		magic = "/" + magic;
 	}
+#ifdef DEBUG
+	cout << "Listening for " << magic << "\n";
+#endif
 
 	int accepted;
 	struct addrinfo theirs;
 	socklen_t addr_size;
+
+	string body;
 
 
 	/* READ DATA */
@@ -107,8 +124,8 @@ int main(int argc, char *argv[]) {
 		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data.\n"
 			"See http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1\n";
 		exit(EXIT_FAILURE);
+#ifdef DEBUG
 	} else if (headers.headers.count("Host")) {
-#ifdef TEE
 		cout << "The user wanted the host " << headers.headers["Host"] << "\n\n";
 #endif
 	}
@@ -118,12 +135,14 @@ int main(int argc, char *argv[]) {
 	} else if (percent_decode(headers.request_uri) == magic) {
 		if (headers.method == "GET") {
 			send(accepted, RESPHEADOK, sizeof(RESPHEADOK)-1, 0);
-			send(accepted, RESPBODYGET, sizeof(RESPBODYGET)-1, 0);
+			send(accepted, RESPBODYGET_PREMAGIC, sizeof(RESPBODYGET_PREMAGIC)-1, 0);
+			send(accepted, magic.data(), magic.size(), 0);
+			send(accepted, RESPBODYGET_POSTMAGIC, sizeof(RESPBODYGET_POSTMAGIC)-1, 0);
 		} else { // POST
-			if (headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
+			if (headers.http_version == "HTTP/1.1" && headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
 				send(accepted, RESPHEADCONTINUE, sizeof(RESPHEADCONTINUE)-1, 0);
 			}
-			string body = get_body(ist, headers);
+			body = get_body(ist, headers);
 #ifdef TEE
 			cout << "Body (true length " << body.size() << "):\n" << body;
 #endif
@@ -136,7 +155,9 @@ int main(int argc, char *argv[]) {
 
 	close(accepted);
 
-	exit(EXIT_SUCCESS);
+	cout << body;
+
+	return 0;
 }
 
 
