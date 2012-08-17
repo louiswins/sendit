@@ -15,10 +15,10 @@ using namespace std;
  * support chunked format requests
  * http://jmarshall.com/easy/http/#http1.1s3
  */
-string get_body(istream& is, http_info& headers) {
-	if (!headers.headers.count("Content-Length")) return "";
+string get_body(istream& is, http_headers& headers) {
+	if (!headers.count("Content-Length")) return "";
 	size_t len;
-	istringstream(headers.headers["Content-Length"]) >> len;
+	istringstream(headers["Content-Length"]) >> len;
 
 	string body;
 	body.reserve(len);
@@ -63,23 +63,30 @@ pair<string,string> extract_header(const string& line) {
 	return make_pair(key, val);
 }
 
+
+http_requestinfo parse_request(istream& in) {
+	http_requestinfo ret;
+	string line;
+
+	gethttpline(in, line);
+	istringstream httpstatus(line);
+	httpstatus >> ret.method >> ret.request_uri >> ret.http_version;
+
+#ifdef DEBUG
+	cout << "Request Line: " << ret.method << ' ' << ret.request_uri << ' ' << ret.http_version << '\n';
+#endif
+	return ret;
+}
+
 /* TODO:
  * Make header keys case-insensitive, and add parsing for headers of the form
  * Header: value, value,
  * 	value, value
  * Which is one header only.
  */
-http_info parse_headers(istream& in) {
-	http_info ret;
+http_headers parse_headers(istream& in) {
+	http_headers ret;
 	string curhead;
-
-	gethttpline(in, curhead);
-	istringstream httpstatus(curhead);
-	httpstatus >> ret.method >> ret.request_uri >> ret.http_version;
-
-#ifdef DEBUG
-	cout << "Request Line: " << ret.method << ' ' << ret.request_uri << ' ' << ret.http_version << "\n\n" << "General Headers:" << '\n';
-#endif
 
 	// we do this to avoid messed up parsing on the request line or on an empty line.
 	// if we receive messed-up headers, I don't feel bad about dying because someone
@@ -87,7 +94,7 @@ http_info parse_headers(istream& in) {
 	gethttpline(in, curhead);
 	while (!curhead.empty()) {
 		try {
-			ret.headers.insert(extract_header(curhead));
+			ret.insert(extract_header(curhead));
 		} catch(runtime_error e) {
 			cerr << "Error in header \"" << curhead << "\".\n";
 		}
@@ -96,7 +103,8 @@ http_info parse_headers(istream& in) {
 	}
 
 #ifdef DEBUG
-	for (map<string, string>::const_iterator b = ret.headers.begin(), e = ret.headers.end();
+	cout << "General Headers:\n";
+	for (http_headers::const_iterator b = ret.begin(), e = ret.end();
 			b != e; ++b) {
 		cout << b->first << ": " << b->second << '\n';
 	}

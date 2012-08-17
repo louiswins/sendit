@@ -118,34 +118,35 @@ int main(int argc, char *argv[]) {
 	recv_buf rvbuf(accepted);
 	istream ist(&rvbuf);
 
-	http_info headers = parse_headers(ist);
-	if (headers.http_version == "HTTP/1.1" && !headers.headers.count("Host")) {
+	http_requestinfo req = parse_request(ist);
+	http_headers headers = parse_headers(ist);
+	if (req.http_version == "HTTP/1.1" && !headers.count("Host")) {
 		send(accepted, RESPHEADNOHOST, sizeof(RESPHEADNOHOST)-1, 0);
 		close(accepted);
 		cerr << "Error: No \"Host\" header using HTTP v1.1. The user's sending bad data.\n"
 			"See http://www.w3.org/Protocols/rfc2616/rfc2616-sec19.html#sec19.6.1.1\n";
 		exit(EXIT_FAILURE);
 #ifdef DEBUG
-	} else if (headers.headers.count("Host")) {
-		cout << "The user wanted the host " << headers.headers["Host"] << "\n\n";
+	} else if (headers.count("Host")) {
+		cout << "The user wanted the host " << headers["Host"] << "\n\n";
 #endif
 	}
 
-	if (headers.method != "GET" && headers.method != "POST") {
+	if (req.method != "GET" && req.method != "POST") {
 		send(accepted, RESPHEADNIMPL, sizeof(RESPHEADNIMPL)-1, 0);
-	} else if (percent_decode(headers.request_uri) == magic) {
-		if (headers.method == "GET") {
+	} else if (percent_decode(req.request_uri) == magic) {
+		if (req.method == "GET") {
 			send(accepted, RESPHEADOK, sizeof(RESPHEADOK)-1, 0);
 			send(accepted, RESPBODYGET_PREMAGIC, sizeof(RESPBODYGET_PREMAGIC)-1, 0);
 			send(accepted, magic.data(), magic.size(), 0);
 			send(accepted, RESPBODYGET_POSTMAGIC, sizeof(RESPBODYGET_POSTMAGIC)-1, 0);
 		} else { // POST
-			if (headers.http_version == "HTTP/1.1" && headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
+			if (req.http_version == "HTTP/1.1" && headers.count("Expect") && headers["Expect"] == "100-continue") {
 				send(accepted, RESPHEADCONTINUE, sizeof(RESPHEADCONTINUE)-1, 0);
 			}
 #ifdef DEBUG
-			if (headers.headers.count("Content-Type")) {
-				string bdy = get_boundary(headers.headers["Content-Type"]);
+			if (headers.count("Content-Type")) {
+				string bdy = get_boundary(headers["Content-Type"]);
 				if (bdy.size()) {
 					cout << "Boundary: \"" << bdy << "\"\n";
 				}
