@@ -145,10 +145,15 @@ int main(int argc, char *argv[]) {
 			if (headers.http_version == "HTTP/1.1" && headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
 				send(accepted, RESPHEADCONTINUE, sizeof(RESPHEADCONTINUE)-1, 0);
 			}
-			body = get_body(ist, headers);
-#ifdef TEE
-			cout << "Body (true length " << body.size() << "):\n" << body;
+#ifdef DEBUG
+			if (headers.headers.count("Content-Type")) {
+				string bdy = get_boundary(headers.headers["Content-Type"]);
+				if (bdy.size()) {
+					cout << "Boundary: \"" << bdy << "\"\n";
+				}
+			}
 #endif
+			body = get_body(ist, headers);
 			send(accepted, RESPHEADOK, sizeof(RESPHEADOK)-1, 0);
 			send(accepted, RESPBODYPOST, sizeof(RESPBODYPOST)-1, 0);
 		}

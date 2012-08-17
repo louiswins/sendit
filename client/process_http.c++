@@ -104,3 +104,10 @@ string percent_decode(const string& uri) {
 	}
 	return ret;
 }
+
+string get_boundary(const string& header) {
+	size_t bpos = header.find("boundary=");
+	if (bpos == string::npos)
+		return "";
+	return header.substr(bpos + sizeof("boundary=")-1);
+}

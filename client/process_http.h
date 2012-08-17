@@ -34,5 +34,8 @@ http_info parse_headers(std::istream& in);
 /* A basic utility function for percent-decoding
  */
 std::string percent_decode(const std::string& uri);
+/* Extract boundary from header
+ */
+std::string get_boundary(const std::string& header);
 
 #endif /* PROCESS_HTTP_H */
