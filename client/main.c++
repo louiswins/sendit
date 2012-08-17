@@ -87,7 +87,7 @@
 using namespace std;
 
 int setup_server();
-int receive_connection(int sockfd, struct addrinfo *theirs, socklen_t *addr_size);
+int receive_connection(int sockfd);
 
 
 int main(int argc, char *argv[]) {
@@ -107,15 +107,13 @@ int main(int argc, char *argv[]) {
 
 	int server,
 	    accepted;
-	struct addrinfo theirs;
-	socklen_t addr_size;
 
 	string body;
 
 
 	/* READ DATA */
 	server = setup_server();
-	accepted = receive_connection(server, &theirs, &addr_size);
+	accepted = receive_connection(server);
 
 	recv_buf rvbuf(accepted);
 	istream ist(&rvbuf);
@@ -228,11 +226,10 @@ int setup_server() {
 }
 
 
-int receive_connection(int sockfd, struct addrinfo *theirs, socklen_t *addr_size) {
+int receive_connection(int sockfd) {
 	int ret;
 	/* Accept a connection */
-	*addr_size = sizeof(*theirs);
-	if ((ret = accept(sockfd, (struct sockaddr *)theirs, addr_size)) == -1) {
+	if ((ret = accept(sockfd, NULL, NULL)) == -1) {
 		perror("accept");
 		exit(EXIT_FAILURE);
 	}
