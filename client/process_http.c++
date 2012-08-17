@@ -41,7 +41,7 @@ istream& gethttpline(istream& in, string& str) {
 	return in;
 }
 
-pair<string,string> extract_header(const string &line) {
+pair<string,string> extract_header(const string& line) {
 	size_t colon = line.find_first_of(':');
 	if (colon == string::npos) {
 		throw runtime_error("Bad request data");
@@ -89,7 +89,7 @@ http_info parse_headers(istream& in) {
 	return ret;
 }
 
-string percent_decode(const string &uri) {
+string percent_decode(const string& uri) {
 	string ret;
 	for (string::const_iterator p = uri.begin(); p < uri.end(); ++p) {
 		if (*p == '%') {

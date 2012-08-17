@@ -21,11 +21,11 @@ std::string get_body(std::istream& mysock, http_info& headers);
 /* This is the same as getline() except that it finds a \r\n or \n
  * and discards the leading \r in that case.
  */
-std::istream &gethttpline(std::istream &in, std::string &str);
+std::istream& gethttpline(std::istream& in, std::string& str);
 
 /* This parses a line into a header pair<key, val>
  */
-std::pair<std::string, std::string> extract_header(const std::string &line);
+std::pair<std::string, std::string> extract_header(const std::string& line);
 
 /* Parses the HTTP headers in the stream in.
  */
@@ -33,6 +33,6 @@ http_info parse_headers(std::istream& in);
 
 /* A basic utility function for percent-decoding
  */
-std::string percent_decode(const std::string &uri);
+std::string percent_decode(const std::string& uri);
 
 #endif /* PROCESS_HTTP_H */
