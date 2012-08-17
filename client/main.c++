@@ -86,7 +86,8 @@
 
 using namespace std;
 
-int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size);
+int setup_server();
+int receive_connection(int sockfd, struct addrinfo *theirs, socklen_t *addr_size);
 
 
 int main(int argc, char *argv[]) {
@@ -104,7 +105,8 @@ int main(int argc, char *argv[]) {
 	cout << "Listening for " << magic << "\n";
 #endif
 
-	int accepted;
+	int server,
+	    accepted;
 	struct addrinfo theirs;
 	socklen_t addr_size;
 
@@ -112,7 +114,8 @@ int main(int argc, char *argv[]) {
 
 
 	/* READ DATA */
-	accepted = setup_sockets(&theirs, &addr_size);
+	server = setup_server();
+	accepted = receive_connection(server, &theirs, &addr_size);
 
 	recv_buf rvbuf(accepted);
 	istream ist(&rvbuf);
@@ -153,6 +156,7 @@ int main(int argc, char *argv[]) {
 		send(accepted, RESPHEADNFOUND, sizeof(RESPHEADNFOUND)-1, 0);
 	}
 
+	close(server);
 	close(accepted);
 
 	cout << body;
@@ -162,14 +166,13 @@ int main(int argc, char *argv[]) {
 
 
 
-int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
-	int status;
+int setup_server() {
 	struct addrinfo hints,
 			*res,
 			*p;
-	int sockfd,
-	    ret;
+	int sockfd;
 	int yes=1;
+	int status;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_UNSPEC; /* IPv4 or IPv6 */
@@ -216,15 +219,18 @@ int setup_sockets(struct addrinfo *theirs, socklen_t *addr_size) {
 		exit(EXIT_FAILURE);
 	}
 
+	return sockfd;
+}
+
+
+int receive_connection(int sockfd, struct addrinfo *theirs, socklen_t *addr_size) {
+	int ret;
 	/* Accept a connection */
 	*addr_size = sizeof(*theirs);
 	if ((ret = accept(sockfd, (struct sockaddr *)theirs, addr_size)) == -1) {
 		perror("accept");
 		exit(EXIT_FAILURE);
 	}
-
-	/* Free up the server data */
-	close(sockfd);
 
 	return ret;
 }
