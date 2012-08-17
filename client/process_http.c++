@@ -24,7 +24,16 @@ string get_body(istream& is, http_info& headers) {
 	body.reserve(len);
 	for (size_t i = 0; i < len; ++i) {
 		body.append(1, is.get());
+		if (!is.good()) {
+#ifdef DEBUG
+			cout << " is.good() failed.\n";
+#endif
+			break;
+		}
 	}
+#ifdef DEBUG
+	cout << "Attested body length: " << len << "; real length: " << body.size() << '\n';
+#endif
 
 	return body;
 }
@@ -54,6 +63,12 @@ pair<string,string> extract_header(const string& line) {
 	return make_pair(key, val);
 }
 
+/* TODO:
+ * Make header keys case-insensitive, and add parsing for headers of the form
+ * Header: value, value,
+ * 	value, value
+ * Which is one header only.
+ */
 http_info parse_headers(istream& in) {
 	http_info ret;
 	string curhead;

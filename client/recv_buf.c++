@@ -40,5 +40,9 @@ std::streambuf::int_type recv_buf::underflow() {
 
 	// set buffer pointers
 	setg(base, start, start + n);
+#ifdef TEE
+	for (char *pt = start; pt < start + n; ++pt)
+		putc(*pt, stderr);
+#endif
 	return traits_type::to_int_type(*gptr());
 }
