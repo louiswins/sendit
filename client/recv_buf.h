@@ -9,7 +9,7 @@
 /**
  * Usage:
  * recv_buf buf(socket);
- * istream is(buf);
+ * istream is(&buf);
  * (Now you can use is as any other istream, e.g. is >> variable, is.get(), &c.
  */
 

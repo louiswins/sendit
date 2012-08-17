@@ -97,7 +97,10 @@ int main(int argc, char *argv[]) {
 	/* READ DATA */
 	accepted = setup_sockets(&theirs, &addr_size);
 
-	http_info headers = parse_headers(accepted);
+	recv_buf rvbuf(accepted);
+	istream ist(&rvbuf);
+
+	http_info headers = parse_headers(ist);
 	if (headers.http_version == "HTTP/1.1" && !headers.headers.count("Host")) {
 		send(accepted, RESPHEADNOHOST, sizeof(RESPHEADNOHOST)-1, 0);
 		close(accepted);
@@ -120,7 +123,7 @@ int main(int argc, char *argv[]) {
 			if (headers.headers.count("Expect") && headers.headers["Expect"] == "100-continue") {
 				send(accepted, RESPHEADCONTINUE, sizeof(RESPHEADCONTINUE)-1, 0);
 			}
-			string body = get_body(accepted, headers);
+			string body = get_body(ist, headers);
 #ifdef TEE
 			cout << "Body (true length " << body.size() << "):\n" << body;
 #endif

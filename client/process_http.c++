@@ -10,13 +10,10 @@
 
 using namespace std;
 
-string get_body(int mysock, http_info headers) {
+string get_body(istream& is, http_info& headers) {
 	if (!headers.headers.count("Content-Length")) return "";
 	size_t len;
 	istringstream(headers.headers["Content-Length"]) >> len;
-
-	recv_buf buf(mysock);
-	istream is(&buf);
 
 	string body;
 	body.reserve(len);
@@ -28,7 +25,7 @@ string get_body(int mysock, http_info headers) {
 }
 
 
-istream &gethttpline(istream &in, string &str) {
+istream& gethttpline(istream& in, string& str) {
 	getline(in, str);
 	size_t sz = str.size();
 	// if the client uses proper HTTP (and ends lines with \r\n) we take
@@ -52,38 +49,36 @@ pair<string,string> extract_header(const string &line) {
 	return make_pair(key, val);
 }
 
-http_info parse_headers(int sock) {
-	recv_buf buf(sock);
-	istream rvstream(&buf);
-
+http_info parse_headers(istream& in) {
 	http_info ret;
-
 	string curhead;
 
-	gethttpline(rvstream, curhead);
+	gethttpline(in, curhead);
 	istringstream httpstatus(curhead);
 	httpstatus >> ret.method >> ret.request_uri >> ret.http_version;
 
-#ifdef TEE
+#ifdef DEBUG
 	cout << "Request Line: " << ret.method << ' ' << ret.request_uri << ' ' << ret.http_version << "\n\n" << "General Headers:" << '\n';
 #endif
 
 	// we do this to avoid messed up parsing on the request line or on an empty line.
 	// if we receive messed-up headers, I don't feel bad about dying because someone
 	// is doing something nefarious.
-	gethttpline(rvstream, curhead);
+	gethttpline(in, curhead);
 	while (!curhead.empty()) {
 		try {
 			ret.headers.insert(extract_header(curhead));
 		} catch(runtime_error e) {
-			continue;
+			cerr << "Error in header \"" << curhead << "\".\n";
 		}
 		
-		gethttpline(rvstream, curhead);
+		gethttpline(in, curhead);
 	}
-#ifdef TEE
-	for (map<string,string>::const_iterator it = ret.headers.begin(); it != ret.headers.end(); ++it) {
-		cout << it->first << ": " << it->second << '\n';
+
+#ifdef DEBUG
+	for (map<string, string>::const_iterator b = ret.headers.begin(), e = ret.headers.end();
+			b != e; ++b) {
+		cout << b->first << ": " << b->second << '\n';
 	}
 #endif
 	return ret;
